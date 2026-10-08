@@ -10,10 +10,18 @@ The overall workflow doesn't have a ton of parts but there are 4 scripts that ne
 
 First two weeks: Continue working on understanding the matlab script, read in the files from the spectrometer via python, ideally begin on rewriting the analysis files. 
 
-Essentially the rest of the project: Work through and organize everything in the analysis python code but make sure all of the equations are worked out correctly so that there isn't a domino effect of errors in calculations. Also, cross check the equations with the matlab code, ie. run sections of the matlab code so that every answer in the python code is double checked with the original code. 
+Essentially the rest of the project: Work through and organize everything in the analysis python code but make sure all of the equations are worked out correctly so that there isn't a domino effect of errors in calculations. Also, cross check the equations with the matlab code, ie. run sections of the matlab code so that every answer in the python code is double checked with the original code. Rather than continuing to try to go block by block mimicking the matlab script, instead I will clean and create a new structure that is more user friendly, as found out by the first few weeks of this project, trying to even start on FROGAnalysis the way the matlab code is not the way to go about this. 
 
 Final week to two weeks: Rewrite the plotting software in python, and continuously test the completed files to ensure they are correct. 
 
+As for the overall workflow of the project, you should start in NewLoadFrogTrace, which will generate your initial wavelength (or frequency) vs. time with the heatmap representing intensity. From there, you should take this data into FROGAnalysis file where you should be able to put in your file(s) and get back, intensity vs. time, phase vs. time, intensity vs. frequency,  phase vs. frequency, FROG Error, and how the modeled result differs from the normal result. 
+
 # Points to focus on
 
-Continuously push everything to github, backup files, work in an organized manner, and double check everything with the results we get in matlab. 
+Continuously push everything to github, backup files, work in an organized manner, and double check everything with the results we get in matlab. The original software starts with an initial guess, then iterates back and forth between the simulated data and the real data, from here it continues iterating back and forth until error is minimized, the path taken throughout this project will be slightly different with the same goals in mind, create a program that minimizes the error within the simulated waveform, ideally improving not only usability of the code, but lessening the overall error of the results. This will be cross checked throughout the project by double checking results against the matlab program. 
+
+# Getting started with FROG software
+
+Step 1. Users will want to being at "1_NewLoadFrogTrace.ipynb", the default input files are within the python package, these files are: filename = 'data_1400_afterBS.dat', wave = 'wavelengths_1400_afterBS.dat', time = 'times_1400_afterBS.dat'. The filename, becomes referenced as 'spec' short for spectrum, think of it as intensity. 'wave' is the wavelengths within the pulse, and 'time' is the time corresponding to the data taken. From here, call on the frog.heat_map() function to get your initial wavelength vs. time and intensity heatmap, this will show you the output taken from the spectrometer. 
+
+

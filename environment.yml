@@ -2,6 +2,7 @@
 # - Purpose: Conda environment for FROG project.
 # - Used by: `make init` and GitHub Actions setup.
 
+
 name: FROG_ENV
 channels:
   - conda-forge
@@ -16,12 +17,13 @@ dependencies:
   - pre-commit  # Optional: run checks automatically before commit
   - ipykernel  # Optional: Python kernel support for notebooks
   - jupyterlab  # Optional: notebook/lab interface
-  - StackGP
   - numpy
   - pandas
   - matplotlib
   - seaborn
-
+  - math
+  - pip: 
+    - StackGP
 
 prefix: ./envs
 

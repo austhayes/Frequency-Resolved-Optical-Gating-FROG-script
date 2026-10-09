@@ -22,6 +22,22 @@ Continuously push everything to github, backup files, work in an organized manne
 
 # Getting started with FROG software
 
-Step 1. Users will want to being at "1_NewLoadFrogTrace.ipynb", the default input files are within the python package, these files are: filename = 'data_1400_afterBS.dat', wave = 'wavelengths_1400_afterBS.dat', time = 'times_1400_afterBS.dat'. The filename, becomes referenced as 'spec' short for spectrum, think of it as intensity. 'wave' is the wavelengths within the pulse, and 'time' is the time corresponding to the data taken. From here, call on the frog.heat_map() function to get your initial wavelength vs. time and intensity heatmap, this will show you the output taken from the spectrometer. 
+To access environment: 
+     Access the environment by running the following code in the command line:
+
+     A. conda create --name FROG_ENV python=3.10
+
+ 
+     B. conda activate FROG_ENV
+
+
+     C. conda install ipykernel
+
+
+     D. python -m ipykernel install --user --name=FROG_ENV --display-name "Python (FROG_ENV)"
+
+Once in the environment, the user should navigate to the "1_NewLoadFrogTrace.ipynb" notebook. The default input files are within the python package, these files are: filename = 'data_1400_afterBS.dat', wave = 'wavelengths_1400_afterBS.dat', time = 'times_1400_afterBS.dat'. The filename, becomes referenced as 'spec' short for spectrum, think of it as intensity. 'wave' is the wavelengths within the pulse, and 'time' is the time corresponding to the data taken. From here, call on the frog.heat_map() function to get your initial wavelength vs. time and intensity heatmap, this will show you the output taken from the spectrometer. 
+
+Once you confirm the data matches up with the plot seen on the spectrometer (or ideally cleaned up a bit). Users should then navigate to the "2_FROGAnalysis.ipynb" notebook. Here, the first step will be to retrieve the measurment time (t). The time users come in with, should be the time delay, if not the time delay you should utilize the 
 
 

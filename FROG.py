@@ -139,12 +139,6 @@ The goal within this function is to setup the field, the projection algorithm wi
         return E_spectrum_t, I_t, updated_field
 
     def frog_projection_new(self, intensity_2d, max_iterations=1000, threshold_RMS=0.05):
-
-       """
-
-    The Projection algorithm is very mathematical, the goal here is to find the correct electric field equation that describes the radiation being      observed within the system. I utilized a variety of resources to help critique the function, google AI was utilized to help with the projection     algorithm. URLS: https://link.springer.com/article/10.1186/s43020-024-00139-4, https://arxiv.org/html/1708.03560v1.
-
-        """
         
         I_meas = intensity_2d.to_numpy() if hasattr(intensity_2d, 'to_numpy') else intensity_2d
         N_f, N_t = I_meas.shape  # N_f = 2048, N_t = 133

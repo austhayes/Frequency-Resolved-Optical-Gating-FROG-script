@@ -138,81 +138,96 @@ The goal within this function is to setup the field, the projection algorithm wi
         
         return E_spectrum_t, I_t, updated_field
 
-    def projection(self, intensity, freq, threshold_RMS=0.01, max_iterations=500,):
+    def frog_projection_new(self, intensity_2d, max_iterations=1000, threshold_RMS=0.05):
 
-        """
+       """
 
     The Projection algorithm is very mathematical, the goal here is to find the correct electric field equation that describes the radiation being      observed within the system. I utilized a variety of resources to help critique the function, google AI was utilized to help with the projection     algorithm. URLS: https://link.springer.com/article/10.1186/s43020-024-00139-4, https://arxiv.org/html/1708.03560v1.
 
         """
-        N = len(intensity.columns)
-
-        t = np.linspace(-7, 7, N)
-
-        E_t = np.sqrt(2*math.log(2))*np.exp(-t**2) * np.exp(1j * np.random.uniform(0, 2*np.pi, N))
         
+        I_meas = intensity_2d.to_numpy() if hasattr(intensity_2d, 'to_numpy') else intensity_2d
+        N_f, N_t = I_meas.shape  # N_f = 2048, N_t = 133
+        
+        # 1: E_t must match N_f (2048) because it maps directly to your frequencies
+        E_t = np.exp(-0.5 * (np.linspace(-3, 3, N_f))**2) * np.exp(1j * np.random.uniform(0, 2*np.pi, N_f))
+        
+        FROG_mag = np.sqrt(np.maximum(I_meas, 0))
         rms_errors = []
-        print(max_iterations)
-
-        for i in range(0, max_iterations):
-            # Transform to the frequency domain, utilizing a fast fourier transform.
-            E_f = np.fft.fft(E_t)
-            I_calc = np.abs(E_f) ** 2
+    
+        # Map the 133 delay steps to index shifts on the 2048 time grid
+        # This centers the shifts around 0 delay
+        delay_indices = np.linspace(-N_t // 2, N_t // 2, N_t).astype(int)
+    
+        for iteration in range(max_iterations):
+            E_sig_t = np.zeros((N_f, N_t), dtype=complex)
             
-            # Root mean squared error between calculated and measured intensity.
-            rms_error = np.sqrt(np.mean((I_calc - intensity) ** 2))
+            # 1. Construct 2D Signal Field using the mapped delays
+            for j in range(N_t):
+                shift_amount = delay_indices[j]
+                E_shifted = np.roll(E_t, shift_amount) 
+                
+                # CRITICAL FIX 2: Both sides are now length 2048
+                E_sig_t[:, j] = E_t * E_shifted
+            
+            # 2. Convert to Frequency Domain along the rows (axis 0)
+            E_sig_f = np.fft.fftshift(np.fft.fft(np.fft.ifftshift(E_sig_t, axes=0), axis=0), axes=0)
+            
+            # 3. Calculate Error Metric
+            I_calc = np.abs(E_sig_f)**2
+            I_calc_norm = I_calc / (np.max(I_calc) + 1e-12)
+            I_meas_norm = I_meas / (np.max(I_meas) + 1e-12)
+            rms_error = np.sqrt(np.mean((I_calc_norm - I_meas_norm)**2))
             rms_errors.append(rms_error)
             
-            # Convergence condition
             if rms_error < threshold_RMS:
-                print(f"Converged at iteration {i} with RMS error: {rms_error:.4f}")
+                print(f"Converged at iteration {iteration} with RMS: {rms_error:.4f}")
                 break
                 
-            # Applying projection
-            calculated_phase = np.angle(E_f)
-            E_f_updated = np.sqrt(intensity) * np.exp(1j * calculated_phase)
+            # 4. Intensity Constraint Substitution
+            calculated_phase = np.angle(E_sig_f)
+            E_sig_f_updated = FROG_mag * np.exp(1j * calculated_phase)
             
-            # Utilizing an inverse fourier transform to transform back into the time domain. 
-            E_t_updated = np.fft.ifft(E_f_updated)
+            # 5. Transform back to Time Domain
+            E_sig_t_updated = np.fft.fftshift(np.fft.ifft(np.fft.ifftshift(E_sig_f_updated, axes=0), axis=0), axes=0)
             
-            # Projection with a mask related to assumed pulse length to filter out noise. 
-            E_t = E_t_updated  
+            # 6. Extract New 1D E(t) field 
+            # Grabbing the central delay column (zero-delay profile)
+            E_t_new = E_sig_t_updated[:, N_t // 2] 
+            E_t = E_t_new / (np.max(np.abs(E_t_new)) + 1e-12)
 
-            #Need to find FWHM to find time:
-            maximum_val = intensity.max()
-            half_max = maximum_val/2
-                    
-            I_t = np.abs(E_t) ** 2
+            #7. Extract temporal and spectral phase from the Electric field.
 
-            # Finding main peak
-            #peaks, _ = find_peaks(I_t, height=np.max(I_t) * 0.5)
+            temporal_phase = np.unwrap(np.angle(E_t))
+
+            #E_f = np.fft(E_t)
+            E_f = np.fft.fftshift(np.fft.fft(np.fft.ifftshift(E_t)))
+            spectral_phase = np.unwrap(np.angle(E_f))
             
-            # Calculating FWHM, 0.5 corresponds to half of the peak height
-            #results_half = peak_widths(I_t, peaks, rel_height=0.5)
             
-            # Convert width from index count to units of time
-           ## dt = t[1] - t[0]
-            ##fwhm_samples = results_half[0][0]
-            ##fwhm_time = fwhm_samples * dt
-                
-            ##time_window_mask = (fwhm_time >= -100) & (fwhm_time <= 100)
-            ##E_t[~time_window_mask] = 0  # Force everything outside the window to be 0
+        return E_t, rms_errors, I_calc, temporal_phase, spectral_phase
+
+    def calc_time(self, wavelengths, E_t):
+        bw = const.c/(np.min(wavelengths)*1e-9) - const.c/(np.max(wavelengths)*1e-9)
+        dt = (1/bw) * 1e15 #units of fs
+        
+        N = len(E_t) #Number of steps, should be obtained from the frog_projection_new function
+
+        time_range = np.linspace( -N//2, N//2 - 1, N) * dt
+        I_t = np.abs(E_t)**2
+        I_norm = I_t/I_t.max()
+
+        half_max = np.where(I_norm >= 1/2)[0]
+
+        if len(half_max) >= 2:
+            start = half_max[0]
+            end = half_max[-1]
+
+            fwhm = time_range[end] - time_range[start]
+            print('Time step:', dt,'fs')
+            print('Pulse duration (fwhm):', fwhm, 'fs')
+
         else:
-            print(f'Maxed iterations reached. Max iterations: {max_iterations}')
-
+            print('Could not calculate time.')
+        return fwhm, dt
         
-        E_t = new_arr = np.nan_to_num(E_t)
-            
-        return E_t, rms_errors
-        
-
-"""
-Analysis
-
-"""
-def Analysis():
-    print("This function will output the analysis of the FROG data")
-    """
-    Mathematically, the first step, Fourier transform to convert data from the frequency domain to the time domain, and vice versa=. This is a critical next step that will be relied on heavily throughout the rest of the project. Other than this, there is a lot of sort of splitting up of the data that needs to be done. The matlab code does a lot of extra work with the data files that I am not positive is really all that necesssary so I have been spending a bit of time trying to figure out what I need, and how to do this in a clear and concise manner to make sure it is easy to understand, as it is currently, not at all. 
-
-    """

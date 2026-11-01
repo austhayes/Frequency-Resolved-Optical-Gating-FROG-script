@@ -85,23 +85,6 @@ class loading_mapping():
 
         return freq
 
-"""
-Utilizing StackGP in order to fit the data, this will return the equation that best fits the data, we will then begin error checking after working with said outputted equation.
-    
-"""
-
-class fitting():
-    def fitted_data(self, x, y, z, gens = 100):
-        """
-Not correct yet, function will not run properly. Still in progress. 
-
-        """
-        X, Y = np.meshgrid(x, y)
-        X_ = np.vstack([X.ravel(), Y.ravel()])
-        model = StackGPRegressor(generations=gens, ops="allOps" )
-        model.fit(X_, z)
-        return model.get_model_string()
-
 
 class obtain_tau():
     def get_tau(self, delta_x):
@@ -139,18 +122,22 @@ The goal within this function is to setup the field, the projection algorithm wi
         return E_spectrum_t, I_t, updated_field
 
     def frog_projection_new(self, intensity_2d, max_iterations=1000, threshold_RMS=0.05):
-        
+        """
+
+The goal within this function is to do the conversion from intensity to the electric field. Within this equation I have used multiple sources such as a variety of nonlinear optics resources (specifically for FROG setups) and google AI to help with issues within the code. URLs: https://eng.libretexts.org/Bookshelves/Electrical_Engineering/Electro- Optics/Ultrafast_Optics_(Kaertner)/10%3A_Pulse_Characterization/10.03%3A_Frequency_Resolved_Optical_Gating_(FROG) and New Geofferys Nonlinear Optics textbook.
+
+        """       
         I_meas = intensity_2d.to_numpy() if hasattr(intensity_2d, 'to_numpy') else intensity_2d
         N_f, N_t = I_meas.shape  # N_f = 2048, N_t = 133
         
-        # 1: E_t must match N_f (2048) because it maps directly to your frequencies
+        # 1: Making sure E_t and N_f are the same length
         E_t = np.exp(-0.5 * (np.linspace(-3, 3, N_f))**2) * np.exp(1j * np.random.uniform(0, 2*np.pi, N_f))
         
         FROG_mag = np.sqrt(np.maximum(I_meas, 0))
         rms_errors = []
     
-        # Map the 133 delay steps to index shifts on the 2048 time grid
-        # This centers the shifts around 0 delay
+        # Mapping the delay steps (133) to the indicie shifts in terms of time (2048)
+        # Centering around 0 delay time
         delay_indices = np.linspace(-N_t // 2, N_t // 2, N_t).astype(int)
     
         for iteration in range(max_iterations):
@@ -160,14 +147,12 @@ The goal within this function is to setup the field, the projection algorithm wi
             for j in range(N_t):
                 shift_amount = delay_indices[j]
                 E_shifted = np.roll(E_t, shift_amount) 
-                
-                # CRITICAL FIX 2: Both sides are now length 2048
                 E_sig_t[:, j] = E_t * E_shifted
             
             # 2. Convert to Frequency Domain along the rows (axis 0)
             E_sig_f = np.fft.fftshift(np.fft.fft(np.fft.ifftshift(E_sig_t, axes=0), axis=0), axes=0)
             
-            # 3. Calculate Error Metric
+            # 3. Calculating error to setup the breaking of the function if the error condition is met (threshold_RMS)
             I_calc = np.abs(E_sig_f)**2
             I_calc_norm = I_calc / (np.max(I_calc) + 1e-12)
             I_meas_norm = I_meas / (np.max(I_meas) + 1e-12)
@@ -178,19 +163,27 @@ The goal within this function is to setup the field, the projection algorithm wi
                 print(f"Converged at iteration {iteration} with RMS: {rms_error:.4f}")
                 break
                 
-            # 4. Intensity Constraint Substitution
+            # 4. Updating the field
             calculated_phase = np.angle(E_sig_f)
             E_sig_f_updated = FROG_mag * np.exp(1j * calculated_phase)
             
-            # 5. Transform back to Time Domain
+            # 5. Going back to the time domain
             E_sig_t_updated = np.fft.fftshift(np.fft.ifft(np.fft.ifftshift(E_sig_f_updated, axes=0), axis=0), axes=0)
             
-            # 6. Extract New 1D E(t) field 
-            # Grabbing the central delay column (zero-delay profile)
-            E_t_new = E_sig_t_updated[:, N_t // 2] 
+            # 6. Grabbing the 1D E(t) field 
+            # Updating the field
+            #E_t_new = E_sig_t_updated[:, N_t // 2] 
+            #E_t = E_t_new / (np.max(np.abs(E_t_new)) + 1e-12)
+            E_t_new = np.zeros_like(E_t, dtype=complex)
+            for j in range(N_t):
+                shift_amount = delay_indices[j]
+                E_shifted_conj = np.conj(np.roll(E_t, shift_amount))
+                E_t_new += E_sig_t_updated[:, j] * E_shifted_conj
+            
+            # Normalization
             E_t = E_t_new / (np.max(np.abs(E_t_new)) + 1e-12)
 
-            #7. Extract temporal and spectral phase from the Electric field.
+            #7. Extracting relative (temporal) and spectral phase
 
             temporal_phase = np.unwrap(np.angle(E_t))
 
@@ -207,7 +200,7 @@ The goal within this function is to setup the field, the projection algorithm wi
         
         N = len(E_t) #Number of steps, should be obtained from the frog_projection_new function
 
-        time_range = np.linspace( -N//2, N//2 - 1, N) * dt
+        time_range = np.linspace(-N//2, N//2 - 1, N) * dt
         I_t = np.abs(E_t)**2
         I_norm = I_t/I_t.max()
 
